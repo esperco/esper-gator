@@ -1,0 +1,19 @@
+# Event aggregator, sending data to Amazon Cloudwatch every minute
+# or every 5 minutes instead of for each event.
+
+OCAML_LIBS = $(OCAML_LIBS_gator)
+
+FILES[] =
+  gator_default
+  gator_common
+  gator_client
+  gator_server
+
+OCamlLibrary(gator, $(FILES))
+Meta(gator)
+
+.DEFAULT: META gator.cma gator.cmxa
+
+.PHONY: clean
+clean:
+	rm -f *.o *.a *.cm* *~ *.annot *.run *.opt META
