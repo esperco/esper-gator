@@ -1,4 +1,8 @@
-val create : ?port: int -> ?period: float -> unit -> unit Lwt.t
+val create :
+  ?namespace: string ->
+  ?period: float ->
+  ?port: int ->
+  unit -> unit Lwt.t
   (** Create a server listening on the given UDP port.
       See defaults in gator_default.ml. *)
 

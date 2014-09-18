@@ -15,11 +15,11 @@ type accumulators = (string, float) Hashtbl.t
 let create_accumulators () : accumulators =
   Hashtbl.create 100
 
-let flush_accumulators acc =
+let flush_accumulators ~namespace acc =
   Hashtbl.replace acc "gator.flush" 1.;
   let jobs =
     Hashtbl.fold (fun k v l ->
-      Gator_aws.put_metric_data ~namespace:"gator" ~metric_name: k ~value: v
+      Gator_aws.put_metric_data ~namespace ~metric_name: k ~value: v
       :: l
     ) acc []
   in
@@ -68,7 +68,11 @@ let init_logging opt_file =
   | Some file -> redirect_stdout_stderr file
   | None -> ()
 
-let create ?(port = Gator_default.port) ?(period = Gator_default.period) () =
+let create
+    ?(namespace = Gator_default.namespace)
+    ?(period = Gator_default.period)
+    ?(port = Gator_default.port)
+    () =
   let socket =
     Lwt_unix.socket Unix.PF_INET Unix.SOCK_DGRAM
       (Unix.getprotobyname "udp").Unix.p_proto
@@ -96,7 +100,7 @@ let create ?(port = Gator_default.port) ?(period = Gator_default.period) () =
   in
   let periodic_job =
     create_timer period
-      (fun () -> flush_accumulators accumulators)
+      (fun () -> flush_accumulators ~namespace accumulators)
   in
   let all = join [ server_loop (); periodic_job ] in
   all
@@ -107,6 +111,7 @@ let main ~offset =
 
   let foreground = ref false in
   let log_filename = ref Gator_default.server_log in
+  let namespace = ref Gator_default.namespace in
   let period = ref Gator_default.period in
   let port = ref Gator_default.port in
   let options = [
@@ -117,6 +122,10 @@ let main ~offset =
     "-log", Arg.Set_string log_filename,
     sprintf "
           Log file (default: %s)" Gator_default.server_log;
+
+    "-ns", Arg.Set_string namespace,
+    sprintf "
+          Cloudwatch namespace (default: %s)" Gator_default.namespace;
 
     "-period", Arg.Set_float period,
     sprintf "
@@ -143,7 +152,8 @@ let main ~offset =
       options anon_fun usage_msg;
 
     let run () =
-      let jobs = create ~port: !port ~period: !period () in
+      let jobs =
+        create ~namespace: !namespace ~port: !port ~period: !period () in
       Lwt_main.run jobs;
       assert false
     in
