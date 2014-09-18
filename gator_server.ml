@@ -1,7 +1,57 @@
-open Printf
+(* Event aggregator UDP server *)
 
-let handle_request s =
-  printf "Request: %S\n%!" s
+(*
+   Testing:
+
+   echo "yo" | nc -uw0 localhost 42222
+*)
+
+open Printf
+open Log
+open Lwt
+
+type accumulators = (string, float) Hashtbl.t
+
+let create_accumulators () : accumulators =
+  Hashtbl.create 100
+
+let flush_accumulators acc =
+  Hashtbl.replace acc "gator.flush" 1.;
+  let jobs =
+    Hashtbl.fold (fun k v l ->
+      Gator_aws.put_metric_data ~namespace:"gator" ~metric_name: k ~value: v
+      :: l
+    ) acc []
+  in
+  Hashtbl.clear acc;
+  join jobs
+
+let add acc k v =
+  let v0 =
+    try Hashtbl.find acc k
+    with Not_found -> 0.
+  in
+  Hashtbl.replace acc k (v0 +. v)
+
+let handle_request acc s =
+  let k, v = Gator_request.parse_request s in
+  add acc k v;
+  return ()
+
+let rec create_timer period action =
+  Lwt_unix.sleep period >>= fun () ->
+  (* start next period immediately *)
+  let next_timer = create_timer period action in
+  catch
+    (fun () -> action ())
+    (fun e ->
+       logf `Error "%s" (string_of_exn e);
+      return ()
+    )
+  >>= fun () ->
+  (* finish after timer or after action, whichever finishes last *)
+  next_timer
+
 
 (* Redirect stdout and stderr to the same log file *)
 let redirect_stdout_stderr fname =
@@ -11,32 +61,54 @@ let redirect_stdout_stderr fname =
   Unix.dup2 log_fd Unix.stdout;
   Unix.dup2 log_fd Unix.stderr
 
-let init_logging log_file =
+let init_logging opt_file =
   Printexc.record_backtrace true;
-  redirect_stdout_stderr log_file
+  Log.service := "gator";
+  match opt_file with
+  | Some file -> redirect_stdout_stderr file
+  | None -> ()
 
-let create ?(port = Gator_default.port) () =
+let create ?(port = Gator_default.port) ?(period = Gator_default.period) () =
   let socket =
-    Unix.socket Unix.PF_INET Unix.SOCK_DGRAM
+    Lwt_unix.socket Unix.PF_INET Unix.SOCK_DGRAM
       (Unix.getprotobyname "udp").Unix.p_proto
   in
-  Unix.bind socket (Unix.ADDR_INET (Unix.inet_addr_any, port));
+  Lwt_unix.bind socket (Unix.ADDR_INET (Unix.inet_addr_any, port));
 
-  let buf = String.create 65536 in
-  while true do
-    let len, sender_addr = Unix.recvfrom socket buf 0 (String.length buf) [] in
-    if len >= 0 then
-      handle_request (String.sub buf 0 len)
-  done;
-  assert false
+  let accumulators = create_accumulators () in
+
+  let buf = Lwt_bytes.create 65536 in
+  let rec server_loop () =
+    Lwt_bytes.recvfrom socket buf 0 (Lwt_bytes.length buf) []
+    >>= fun (len, sender_addr) ->
+    (if len >= 0 then (
+       try
+         let s = Lwt_bytes.to_string (Lwt_bytes.extract buf 0 len) in
+         handle_request accumulators s
+       with e ->
+         let msg = string_of_exn e in
+         logf `Error "Exception %s" msg;
+         return ()
+     )
+     else return ()
+    ) >>= fun () ->
+    server_loop ()
+  in
+  let periodic_job =
+    create_timer period
+      (fun () -> flush_accumulators accumulators)
+  in
+  let all = join [ server_loop (); periodic_job ] in
+  all
 
 let main ~offset =
     let argv = Sys.argv in
   assert (offset <= Array.length argv - 1);
 
   let foreground = ref false in
-  let port = ref Gator_default.port in
   let log_filename = ref Gator_default.server_log in
+  let period = ref Gator_default.period in
+  let port = ref Gator_default.port in
   let options = [
     "-fg", Arg.Set foreground,
     "
@@ -45,6 +117,10 @@ let main ~offset =
     "-log", Arg.Set_string log_filename,
     sprintf "
           Log file (default: %s)" Gator_default.server_log;
+
+    "-period", Arg.Set_float period,
+    sprintf "
+          Period between flushes (default: %g seconds)" Gator_default.period;
 
     "-port", Arg.Set_int port,
     sprintf "
@@ -66,16 +142,21 @@ let main ~offset =
       ~current: (ref offset) argv
       options anon_fun usage_msg;
 
-    let run () = create ~port: !port () in
-    if !foreground then
+    let run () =
+      let jobs = create ~port: !port ~period: !period () in
+      Lwt_main.run jobs;
+      assert false
+    in
+    if !foreground then (
+      init_logging None;
       run ()
-    else (
-      init_logging !log_filename;
-      if Unix.fork () = 0 then
-        run ()
-      else
-        exit 0
     )
+    else if Lwt_unix.fork () = 0 then (
+      init_logging (Some !log_filename);
+      run ()
+    )
+    else
+      exit 0
 
   with
   | Arg.Help _usage_msg -> usage (); exit 0

@@ -7,6 +7,8 @@ FILES[] =
   gator_default
   gator_common
   gator_client
+  gator_aws
+  gator_request
   gator_server
 
 OCamlLibrary(gator, $(FILES))

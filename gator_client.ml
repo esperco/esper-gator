@@ -8,19 +8,6 @@ let send
     key =
   return ()
 
-let validate_key s =
-  if not (Gator_common.is_valid_key s) then
-    failwith ("Not a valid key: " ^ s)
-
-let parse_value s =
-  try
-    let v = float_of_string s in
-    if v <= 0. || abs_float v = infinity || v <> v then
-      raise Exit;
-    v
-  with _ ->
-    failwith ("Not a positive number: " ^ s)
-
 let main ~offset =
   let argv = Sys.argv in
   assert (offset <= Array.length argv - 1);
@@ -55,12 +42,12 @@ let main ~offset =
 
     (match List.rev !anon with
      | [k] ->
-         validate_key k;
+         Gator_common.validate_key k;
          key := k
      | [k; v] ->
-         validate_key k;
+         Gator_common.validate_key k;
          key := k;
-         value := parse_value v
+         value := Gator_common.parse_value v
      | _ ->
          failwith "Invalid command-line arguments"
     )
