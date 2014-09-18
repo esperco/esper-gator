@@ -1,4 +1,4 @@
-val send : ?host: string -> ?port: int -> ?value: float -> string -> unit Lwt.t
+val send : ?host: string -> ?port: int -> string -> float -> unit Lwt.t
   (** Send a (key, value) pair to the server.
       The key is a non-empty dot-separated path, each component
       being of the form [a-z][a-z0-9_]*

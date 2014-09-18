@@ -1,3 +1,5 @@
+open Printf
+
 let remove_trailing_newline s =
   let len = String.length s in
   if len > 0 && s.[len-1] = '\n' then
@@ -20,3 +22,11 @@ let parse_request s =
       (k, 1.)
   | _ ->
       failwith ("Malformed request: " ^ s)
+
+let make_request key value =
+  Gator_common.validate_key key;
+  Gator_common.validate_value value;
+  let s = sprintf "%s %g" key value in
+  if String.length s > 512 then
+    failwith "Gator request exceeds legal value of 512";
+  s

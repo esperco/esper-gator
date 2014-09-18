@@ -11,11 +11,14 @@ let validate_key s =
   if not (is_valid_key s) then
     failwith ("Not a valid key: " ^ s)
 
+let validate_value v =
+  if v < 0. || abs_float v = infinity || v <> v then
+    failwith ("Not a positive number: " ^ string_of_float v)
+
 let parse_value s =
-  try
-    let v = float_of_string s in
-    if v <= 0. || abs_float v = infinity || v <> v then
-      raise Exit;
-    v
-  with _ ->
-    failwith ("Not a positive number: " ^ s)
+  let v =
+    try float_of_string s
+    with _ -> failwith ("Not a positive number: " ^ s)
+  in
+  validate_value v;
+  v
