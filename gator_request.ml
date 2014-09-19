@@ -16,17 +16,22 @@ let parse_request s =
   | [k; v] ->
       Gator_common.validate_key k;
       let v = Gator_common.parse_value v in
-      (k, v)
+      (k, Some v)
   | [k] ->
       Gator_common.validate_key k;
-      (k, 1.)
+      (k, None)
   | _ ->
       failwith ("Malformed request: " ^ s)
 
-let make_request key value =
+let make_request key opt_value =
   Gator_common.validate_key key;
-  Gator_common.validate_value value;
-  let s = sprintf "%s %g" key value in
+  let s =
+    match opt_value with
+    | None -> key
+    | Some value ->
+        Gator_common.validate_value value;
+        sprintf "%s %g" key value
+  in
   if String.length s > 512 then
-    failwith "Gator request exceeds legal value of 512";
+    failwith "Gator request exceeds maximum value of 512";
   s

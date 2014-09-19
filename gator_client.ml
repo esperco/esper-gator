@@ -4,7 +4,7 @@ open Lwt
 let send
     ?(host = Gator_default.host)
     ?(port = Gator_default.port)
-    key value =
+    key opt_value =
 
   let socket =
     Lwt_unix.socket Unix.PF_INET Unix.SOCK_DGRAM
@@ -13,7 +13,7 @@ let send
 
   let ipaddr = (Unix.gethostbyname host).Unix.h_addr_list.(0) in
   let portaddr = Unix.ADDR_INET (ipaddr, port) in
-  let msg = Gator_request.make_request key value in
+  let msg = Gator_request.make_request key opt_value in
   Lwt_unix.sendto socket msg 0 (String.length msg) [] portaddr >>= fun len ->
   assert (len = String.length msg);
   return ()
@@ -24,7 +24,7 @@ let main ~offset =
   assert (offset <= Array.length argv - 1);
 
   let key = ref "" in
-  let value = ref 1.0 in
+  let value = ref None in
   let host = ref Gator_default.host in
   let port = ref Gator_default.port in
   let options = [
@@ -58,7 +58,7 @@ let main ~offset =
      | [k; v] ->
          Gator_common.validate_key k;
          key := k;
-         value := Gator_common.parse_value v
+         value := Some (Gator_common.parse_value v)
      | _ ->
          failwith "Invalid command-line arguments"
     );

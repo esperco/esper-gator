@@ -9,6 +9,7 @@ FILES[] =
   gator_client
   gator_aws
   gator_request
+  gator_acc
   gator_server
 
 OCamlLibrary(gator, $(FILES))

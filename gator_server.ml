@@ -10,33 +10,6 @@ open Printf
 open Log
 open Lwt
 
-type accumulators = (string, float) Hashtbl.t
-
-let create_accumulators () : accumulators =
-  Hashtbl.create 100
-
-let flush_accumulators ~namespace acc =
-  Hashtbl.replace acc "gator.flush" 1.;
-  let jobs =
-    Hashtbl.fold (fun k v l ->
-      Gator_aws.put_metric_data ~namespace ~metric_name: k ~value: v
-      :: l
-    ) acc []
-  in
-  Hashtbl.clear acc;
-  join jobs
-
-let add acc k v =
-  let v0 =
-    try Hashtbl.find acc k
-    with Not_found -> 0.
-  in
-  Hashtbl.replace acc k (v0 +. v)
-
-let handle_request acc s =
-  let k, v = Gator_request.parse_request s in
-  add acc k v;
-  return ()
 
 let rec create_timer period action =
   Lwt_unix.sleep period >>= fun () ->
@@ -79,7 +52,7 @@ let create
   in
   Lwt_unix.bind socket (Unix.ADDR_INET (Unix.inet_addr_any, port));
 
-  let accumulators = create_accumulators () in
+  let accumulators = Gator_acc.create_acc () in
 
   let buf = Lwt_bytes.create 65536 in
   let rec server_loop () =
@@ -88,7 +61,7 @@ let create
     (if len >= 0 then (
        try
          let s = Lwt_bytes.to_string (Lwt_bytes.extract buf 0 len) in
-         handle_request accumulators s
+         Gator_acc.handle_request accumulators s
        with e ->
          let msg = string_of_exn e in
          logf `Error "Exception %s" msg;
@@ -100,7 +73,7 @@ let create
   in
   let periodic_job =
     create_timer period
-      (fun () -> flush_accumulators ~namespace accumulators)
+      (fun () -> Gator_acc.flush_accumulators ~namespace ~period accumulators)
   in
   let all = join [ server_loop (); periodic_job ] in
   all
