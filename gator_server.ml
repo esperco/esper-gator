@@ -46,9 +46,15 @@ let create
     ?(period = Gator_default.period)
     ?(port = Gator_default.port)
     () =
+  let proto_number =
+    (* not using
+         (Unix.getprotobyname "udp").Unix.p_proto
+       which may cause Not_found and/or segfault on EC2
+    *)
+    17
+  in
   let socket =
-    Lwt_unix.socket Unix.PF_INET Unix.SOCK_DGRAM
-      (Unix.getprotobyname "udp").Unix.p_proto
+    Lwt_unix.socket Unix.PF_INET Unix.SOCK_DGRAM proto_number
   in
   Lwt_unix.bind socket (Unix.ADDR_INET (Unix.inet_addr_any, port));
 
