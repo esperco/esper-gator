@@ -27,7 +27,10 @@ let make_send
           (Unix.getprotobyname "udp").Unix.p_proto
       in
 
-      let ipaddr = (Unix.gethostbyname host).Unix.h_addr_list.(0) in
+      let ipaddr =
+        try (Unix.gethostbyname host).Unix.h_addr_list.(0)
+        with Not_found -> failwith ("Invalid host " ^ host)
+      in
       let portaddr = Unix.ADDR_INET (ipaddr, port) in
       socket, portaddr
     )
