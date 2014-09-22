@@ -22,9 +22,12 @@ let make_send
 
   let get_socket_portaddr =
     lazy_retry (fun () ->
+      let protocol =
+        try (Unix.getprotobyname "udp").Unix.p_proto
+        with Not_found -> failwith "Protocol not found"
+      in
       let socket =
-        Lwt_unix.socket Unix.PF_INET Unix.SOCK_DGRAM
-          (Unix.getprotobyname "udp").Unix.p_proto
+        Lwt_unix.socket Unix.PF_INET Unix.SOCK_DGRAM protocol
       in
 
       let ipaddr =
