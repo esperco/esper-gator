@@ -1,22 +1,47 @@
 open Printf
 open Lwt
 
-let send
+(*
+   lazy computation that is retried until it returns a value (rather than
+   raising an exception).
+*)
+let lazy_retry f =
+  let r = ref None in
+  fun () ->
+    match !r with
+    | Some x -> x
+    | None ->
+        let x = f () in
+        r := Some x;
+        x
+
+let make_send
     ?(host = Gator_default.host)
     ?(port = Gator_default.port)
-    key opt_value =
+    () =
 
-  let socket =
-    Lwt_unix.socket Unix.PF_INET Unix.SOCK_DGRAM
-      (Unix.getprotobyname "udp").Unix.p_proto
+  let get_socket_portaddr =
+    lazy_retry (fun () ->
+      let socket =
+        Lwt_unix.socket Unix.PF_INET Unix.SOCK_DGRAM
+          (Unix.getprotobyname "udp").Unix.p_proto
+      in
+
+      let ipaddr = (Unix.gethostbyname host).Unix.h_addr_list.(0) in
+      let portaddr = Unix.ADDR_INET (ipaddr, port) in
+      socket, portaddr
+    )
   in
 
-  let ipaddr = (Unix.gethostbyname host).Unix.h_addr_list.(0) in
-  let portaddr = Unix.ADDR_INET (ipaddr, port) in
-  let msg = Gator_request.make_request key opt_value in
-  Lwt_unix.sendto socket msg 0 (String.length msg) [] portaddr >>= fun len ->
-  assert (len = String.length msg);
-  return ()
+  let send key opt_value =
+    let socket, portaddr = get_socket_portaddr () in
+    let msg = Gator_request.make_request key opt_value in
+    Lwt_unix.sendto
+      socket msg 0 (String.length msg) [] portaddr >>= fun len ->
+    assert (len = String.length msg);
+    return ()
+  in
+  send
 
 
 let main ~offset =
@@ -62,7 +87,14 @@ let main ~offset =
      | _ ->
          failwith "Invalid command-line arguments"
     );
-    Lwt_main.run (send ~host: !host ~port: !port !key !value)
+    Lwt_main.run (
+      let rec loop () =
+        let send = make_send ~host: !host ~port: !port () in
+        send !key !value >>= fun () ->
+        loop ()
+      in
+      loop ()
+    )
 
   with
   | Arg.Help _usage_msg -> usage (); exit 0

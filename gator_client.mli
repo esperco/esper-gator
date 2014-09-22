@@ -1,4 +1,8 @@
-val send : ?host: string -> ?port: int -> string -> float option -> unit Lwt.t
+val make_send :
+  ?host: string ->
+  ?port: int ->
+  unit ->
+  (string -> float option -> unit Lwt.t)
   (** Send a (key, value option) pair to the server.
       The key is a non-empty dot-separated path, each component
       being of the form [a-z][a-z0-9_]*
