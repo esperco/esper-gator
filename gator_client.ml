@@ -9,11 +9,12 @@ let lazy_retry f =
   let r = ref None in
   fun () ->
     match !r with
-    | Some x -> x
+    | Some x ->
+        return x
     | None ->
-        let x = f () in
+        f () >>= fun x ->
         r := Some x;
-        x
+        return x
 
 let make_send
     ?(host = Gator_default.host)
@@ -22,26 +23,19 @@ let make_send
 
   let get_socket_portaddr =
     lazy_retry (fun () ->
-      let protocol =
-        (* not using Unix.getprotobyname because it raises Not_found
-           on EC2 under certain unknown conditions *)
-        17
-      in
-      let socket =
-        Lwt_unix.socket Unix.PF_INET Unix.SOCK_DGRAM protocol
-      in
+      Lwt_unix.getprotobyname "udp" >>= fun p ->
+      let proto_number = p.Unix.p_proto in
+      let socket = Lwt_unix.socket Unix.PF_INET Unix.SOCK_DGRAM proto_number in
 
-      let ipaddr =
-        try (Unix.gethostbyname host).Unix.h_addr_list.(0)
-        with Not_found -> failwith ("Invalid host " ^ host)
-      in
+      Lwt_unix.gethostbyname host >>= fun h ->
+      let ipaddr = h.Unix.h_addr_list.(0) in
       let portaddr = Unix.ADDR_INET (ipaddr, port) in
-      socket, portaddr
+      return (socket, portaddr)
     )
   in
 
   let send key opt_value =
-    let socket, portaddr = get_socket_portaddr () in
+    get_socket_portaddr () >>= fun (socket, portaddr) ->
     let msg = Gator_request.make_request key opt_value in
     Lwt_unix.sendto
       socket msg 0 (String.length msg) [] portaddr >>= fun len ->
