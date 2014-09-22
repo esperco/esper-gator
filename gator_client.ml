@@ -23,8 +23,12 @@ let make_send
 
   let get_socket_portaddr =
     lazy_retry (fun () ->
-      Lwt_unix.getprotobyname "udp" >>= fun p ->
-      let proto_number = p.Unix.p_proto in
+      let proto_number =
+        (* not using Unix.getprotobyname because it raises Not_found
+           (possibly followed by a segfault)
+           on EC2 under certain unknown conditions *)
+        17
+      in
       let socket = Lwt_unix.socket Unix.PF_INET Unix.SOCK_DGRAM proto_number in
 
       Lwt_unix.gethostbyname host >>= fun h ->
