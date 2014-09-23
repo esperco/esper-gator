@@ -36,7 +36,7 @@ let redirect_stdout_stderr fname =
 
 let init_logging opt_file =
   Printexc.record_backtrace true;
-  Log.service := "gator";
+  Log.set_service "gator";
   match opt_file with
   | Some file -> redirect_stdout_stderr file
   | None -> ()
