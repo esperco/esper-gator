@@ -22,3 +22,15 @@ let parse_value s =
   in
   validate_value v;
   v
+
+let turn_into_key ~keep_periods s0 =
+  let s = String.lowercase s0 in
+  for i = 0 to String.length s - 1 do
+    match s.[i] with
+    | 'a'..'z'
+    | '0'..'9'
+    | '_' | '-' -> ()
+    | '.' when keep_periods -> ()
+    | _ -> s.[i] <- '_'
+  done;
+  s
