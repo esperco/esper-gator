@@ -52,15 +52,18 @@ let median l =
 
 let flush_accumulators ~namespace ~period acc =
   add1 acc "gator.flush";
-  let jobs1 =
+  let points1 =
     Hashtbl.fold (fun k count l ->
       let rate = float count /. period in
       let k1 = k ^ ".rate" in
-      Gator_aws.put_metric_data ~namespace ~metric_name: k1  ~value: rate
+      Gator_aws_v.create_metric_data_point
+        ~metric_name: k1
+        ~value: rate
+        ()
       :: l
     ) acc.acc1 []
   in
-  let jobs2 =
+  let points2 =
     Hashtbl.fold (fun k vl l ->
       let data = [
         k ^ ".rate", float (List.length vl) /. period;
@@ -71,7 +74,10 @@ let flush_accumulators ~namespace ~period acc =
       ] in
       let jobs =
         List.map (fun (k, v) ->
-          Gator_aws.put_metric_data ~namespace ~metric_name: k ~value: v
+          Gator_aws_v.create_metric_data_point
+            ~metric_name: k
+            ~value: v
+            ()
         ) data
       in
       jobs @ l
@@ -79,7 +85,7 @@ let flush_accumulators ~namespace ~period acc =
   in
   Hashtbl.clear acc.acc1;
   Hashtbl.clear acc.acc2;
-  join (jobs1 @ jobs2)
+  Gator_aws.put_metric_data ~namespace (points1 @ points2)
 
 let handle_request acc s =
   (match Gator_request.parse_request s with

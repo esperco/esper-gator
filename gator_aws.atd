@@ -1,0 +1,57 @@
+(*
+  http://docs.aws.amazon.com/cli/latest/reference/cloudwatch/put-metric-data.html
+*)
+
+type unit_ = [
+  | Seconds
+  | Microseconds
+  | Milliseconds
+  | Bytes
+  | Kilobytes
+  | Megabytes
+  | Gigabytes
+  | Terabytes
+  | Bits
+  | Kilobits
+  | Megabits
+  | Gigabits
+  | Terabits
+  | Percent
+  | Count
+  | Bytes_per_second <json name="Bytes/Second">
+  | Kilobytes_per_second <json name="Kilobytes/Second">
+  | Megabytes_per_second <json name="Megabytes/Second">
+  | Gigabytes_per_second <json name="Gigabytes/Second">
+  | Terabytes_per_second <json name="Terabytes/Second">
+  | Bits_per_second <json name="Bits/Second">
+  | Kilobits_per_second <json name="Kilobits/Second">
+  | Megabits_per_second <json name="Megabits/Second">
+  | Gigabits_per_second <json name="Gigabits/Second">
+  | Terabits_per_second <json name="Terabits/Second">
+  | Count_per_second <json name="Count/Second">
+  | None
+]
+
+type statistic_values = {
+  ?sample_count <json name="SampleCount">: float option;
+  ?sum <json name="Sum">: float option;
+  ?minimum <json name="Minimum">: float option;
+  ?maximum <json name="Maximum">: float option;
+}
+
+type metric_data_point = {
+  metric_name <json name="MetricName">: string;
+  value <json name="Value">: float;
+
+  ?timestamp <json name="Timestamp">: string option;
+    (* Not sure what format it should follow.
+       This is the example given in one place:
+         "Wednesday, June 12, 2013 8:28:20 PM"
+     *)
+
+  ?unit <json name="Unit">: unit_ option;
+
+  ?statistic_values <json name="StatisticValues">: statistic_values option;
+}
+
+type metric_data = metric_data_point list

@@ -7,11 +7,15 @@ FILES[] =
   gator_default
   gator_common
   gator_client
+  gator_aws_t
+  gator_aws_j
+  gator_aws_v
   gator_aws
   gator_request
   gator_acc
   gator_server
 
+Atdgen(gator_aws, -j-std)
 OCamlLibrary(gator, $(FILES))
 Meta(gator)
 
@@ -19,4 +23,4 @@ Meta(gator)
 
 .PHONY: clean
 clean:
-	rm -f *.o *.a *.cm* *~ *.annot *.run *.opt META
+	rm -f *.o *.a *.cm* *~ *.annot *.run *.opt META $(ATDGEN_OUTFILES)
