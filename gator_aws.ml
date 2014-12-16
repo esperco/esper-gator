@@ -12,7 +12,7 @@ let write_to_temp_file metric_data =
   ) >>= fun () ->
   let file_url = "file://" ^ fname in
   let finish () =
-    (try ()(*Sys.remove fname*)
+    (try Sys.remove fname
      with _ ->
        logf `Error "Cannot remove temporary file %s" fname
     );
