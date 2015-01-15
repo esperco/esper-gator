@@ -52,6 +52,6 @@ let rec chunkify max_length l =
   | rest -> chunk :: chunkify max_length rest
 
 let put_metric_data ~namespace metric_data =
-  Lwt_list.iter_p (fun chunk ->
+  Util_conc.iter (chunkify 20 metric_data) (fun chunk ->
     really_put_metric_data ~namespace chunk
-  ) (chunkify 20 metric_data)
+  )
