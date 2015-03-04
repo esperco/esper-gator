@@ -133,7 +133,7 @@ let main ~offset =
     let run () =
       let jobs =
         create ~namespace: !namespace ~port: !port ~period: !period () in
-      Lwt_main.run jobs;
+      Util_lwt_main.run jobs;
       assert false
     in
     if !foreground then (

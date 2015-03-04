@@ -92,7 +92,7 @@ let main ~offset =
      | _ ->
          failwith "Invalid command-line arguments"
     );
-    Lwt_main.run (
+    Util_lwt_main.run (
       let rec loop () =
         let send = make_send ~host: !host ~port: !port () in
         send !key !value >>= fun () ->
