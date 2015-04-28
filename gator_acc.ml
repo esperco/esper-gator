@@ -8,6 +8,7 @@ type acc2 = (string, float list) Hashtbl.t
      used to compute sampling rate and average value. *)
 
 type maxrate_acc = {
+  time: unit -> float; (* returns time in whole seconds *)
   mutable t0: float; (* 1-second precision time *)
   mutable sum: int;
   mutable maxrate: float;
@@ -27,14 +28,18 @@ let create_acc () = {
   acc3 = Hashtbl.create 100;
 }
 
-let create_maxrate_acc () = {
-  t0 = Unix.time ();
+(*
+   The time function must return the time as a whole number of seconds.
+*)
+let create_maxrate_acc ?(time = Unix.time) () = {
+  time = time;
+  t0 = time ();
   sum = 0;
   maxrate = 0.;
 }
 
 let add_to_maxrate_acc acc =
-  let t = Unix.time () in
+  let t = acc.time () in
   if t <> acc.t0 then (
     let rate = 1. in
     acc.maxrate <- max rate acc.maxrate;
@@ -46,13 +51,6 @@ let add_to_maxrate_acc acc =
     let rate = float acc.sum in
     acc.maxrate <- max rate acc.maxrate;
   )
-
-let get_maxrate acc =
-  let result = acc.maxrate in
-  acc.t0 <- Unix.time ();
-  acc.maxrate <- 0.;
-  acc.sum <- 0;
-  result
 
 let add3 acc k =
   let v =
@@ -137,7 +135,7 @@ let flush_accumulators ~namespace ~period acc =
   in
   let points3 =
     Hashtbl.fold (fun k v l ->
-      let maxrate = get_maxrate v in
+      let maxrate = v.maxrate in
       let k1 = k ^ ".maxrate" in
       Gator_aws_v.create_metric_data_point
         ~metric_name: k1
@@ -157,3 +155,30 @@ let handle_request acc s =
    | k, Some v -> add2 acc k v
   );
   return ()
+
+let test_maxrate () =
+  (* Using a fake clock so we control when time switches from a whole
+     second to the next *)
+  let current_time = ref 0. in
+  let time () = !current_time in
+  let tick () = current_time := !current_time +. 1. in
+
+  let acc = create_maxrate_acc ~time () in
+  assert (acc.maxrate = 0.);
+  add_to_maxrate_acc acc;
+  add_to_maxrate_acc acc;
+  assert (acc.maxrate = 2.);
+
+  tick ();
+  assert (acc.maxrate = 2.);
+  add_to_maxrate_acc acc;
+  assert (acc.maxrate = 2.);
+  add_to_maxrate_acc acc;
+  add_to_maxrate_acc acc;
+  assert (acc.maxrate = 3.);
+
+  true
+
+let tests = [
+  "maxrate", test_maxrate;
+]
