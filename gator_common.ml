@@ -24,13 +24,13 @@ let parse_value s =
   v
 
 let turn_into_key ~keep_periods s0 =
-  let s = String.lowercase s0 in
-  for i = 0 to String.length s - 1 do
+  let s = Bytes.lowercase s0 in
+  for i = 0 to Bytes.length s - 1 do
     match s.[i] with
     | 'a'..'z'
     | '0'..'9'
     | '_' | '-' -> ()
     | '.' when keep_periods -> ()
-    | _ -> s.[i] <- '_'
+    | _ -> Bytes.set s i '_'
   done;
-  s
+  Bytes.to_string s
