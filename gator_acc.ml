@@ -1,31 +1,33 @@
 open Lwt
 
-type acc1 = (string, int) Hashtbl.t
+type acc_ev = (string, int) Hashtbl.t
   (* Counters only, used to compute an average rate only. *)
 
-type acc2 = (string, float list) Hashtbl.t
+type acc_val = (string, float list) Hashtbl.t
   (* Events associated with a value,
      used to compute sampling rate and average value. *)
 
 type maxrate_acc = {
   time: unit -> float; (* returns time in whole seconds *)
   mutable t0: float; (* 1-second precision time *)
-  mutable sum: int;
+  mutable sum: float; (* number of events or sum of their associated values *)
   mutable maxrate: float;
 }
 
-type acc3 = (string, maxrate_acc) Hashtbl.t
+type maxrate_tbl = (string, maxrate_acc) Hashtbl.t
 
 type acc = {
-  acc1: acc1;
-  acc2: acc2;
-  acc3: acc3;
+  acc_ev: acc_ev;
+  acc_val: acc_val;
+  maxrate_acc_ev: maxrate_tbl;
+  maxrate_acc_val: maxrate_tbl;
 }
 
 let create_acc () = {
-  acc1 = Hashtbl.create 100;
-  acc2 = Hashtbl.create 100;
-  acc3 = Hashtbl.create 100;
+  acc_ev = Hashtbl.create 100;
+  acc_val = Hashtbl.create 100;
+  maxrate_acc_ev = Hashtbl.create 100;
+  maxrate_acc_val = Hashtbl.create 100;
 }
 
 (*
@@ -34,49 +36,53 @@ let create_acc () = {
 let create_maxrate_acc ?(time = Unix.time) () = {
   time = time;
   t0 = time ();
-  sum = 0;
+  sum = 0.;
   maxrate = 0.;
 }
 
-let add_to_maxrate_acc acc =
+let add_to_maxrate_acc acc inc =
   let t = acc.time () in
   if t <> acc.t0 then (
-    let rate = 1. in
+    let rate = inc in
     acc.maxrate <- max rate acc.maxrate;
     acc.t0 <- t;
-    acc.sum <- 1
+    acc.sum <- inc
   )
   else (
-    acc.sum <- acc.sum + 1;
-    let rate = float acc.sum in
+    acc.sum <- acc.sum +. inc;
+    let rate = acc.sum in
     acc.maxrate <- max rate acc.maxrate;
   )
 
-let add3 acc k =
-  let v =
+let add_val_to_maxrate_acc acc k v =
+  let x =
     try Hashtbl.find acc k
     with Not_found ->
-      let v = create_maxrate_acc () in
-      Hashtbl.add acc k v;
-      v
+      let x = create_maxrate_acc () in
+      Hashtbl.add acc k x;
+      x
   in
-  add_to_maxrate_acc v
+  add_to_maxrate_acc x v
 
-let add1 {acc1; acc3} k =
+let add_ev_to_maxrate_acc acc k =
+  add_val_to_maxrate_acc acc k 1.
+
+let add_without_value {acc_ev; maxrate_acc_ev} k =
   let v0 =
-    try Hashtbl.find acc1 k
+    try Hashtbl.find acc_ev k
     with Not_found -> 0
   in
-  Hashtbl.replace acc1 k (v0 + 1);
-  add3 acc3 k
+  Hashtbl.replace acc_ev k (v0 + 1);
+  add_ev_to_maxrate_acc maxrate_acc_ev k
 
-let add2 {acc2; acc3} k v =
+let add_with_value {acc_val; maxrate_acc_ev; maxrate_acc_val} k v =
   let vl =
-    try Hashtbl.find acc2 k
+    try Hashtbl.find acc_val k
     with Not_found -> []
   in
-  Hashtbl.replace acc2 k (v :: vl);
-  add3 acc3 k
+  Hashtbl.replace acc_val k (v :: vl);
+  add_ev_to_maxrate_acc maxrate_acc_ev k;
+  add_val_to_maxrate_acc maxrate_acc_val k v
 
 let sum l =
   List.fold_left (+.) 0. l
@@ -104,7 +110,7 @@ let median l =
     0.5 *. (a.(n/2-1) +. a.(n/2))
 
 let flush_accumulators ~namespace ~period acc =
-  add1 acc "gator.flush";
+  add_without_value acc "gator.flush";
   let points1 =
     Hashtbl.fold (fun k count l ->
       let rate = float count /. period in
@@ -114,7 +120,7 @@ let flush_accumulators ~namespace ~period acc =
         ~value: rate
         ()
       :: l
-    ) acc.acc1 []
+    ) acc.acc_ev []
   in
   let points2 =
     Hashtbl.fold (fun k vl l ->
@@ -136,7 +142,7 @@ let flush_accumulators ~namespace ~period acc =
         ) data
       in
       jobs @ l
-    ) acc.acc2 []
+    ) acc.acc_val []
   in
   let points3 =
     Hashtbl.fold (fun k v l ->
@@ -147,17 +153,29 @@ let flush_accumulators ~namespace ~period acc =
         ~value: maxrate
         ()
       :: l
-    ) acc.acc3 []
+    ) acc.maxrate_acc_ev []
   in
-  Hashtbl.clear acc.acc1;
-  Hashtbl.clear acc.acc2;
-  Hashtbl.clear acc.acc3;
-  Gator_aws.put_metric_data ~namespace (points1 @ points2 @ points3)
+  let points4 =
+    Hashtbl.fold (fun k v l ->
+      let maxrate = v.maxrate in
+      let k1 = k ^ ".val.maxrate" in
+      Gator_aws_v.create_metric_data_point
+        ~metric_name: k1
+        ~value: maxrate
+        ()
+      :: l
+    ) acc.maxrate_acc_val []
+  in
+  Hashtbl.clear acc.acc_ev;
+  Hashtbl.clear acc.acc_val;
+  Hashtbl.clear acc.maxrate_acc_ev;
+  Hashtbl.clear acc.maxrate_acc_val;
+  Gator_aws.put_metric_data ~namespace (points1 @ points2 @ points3 @ points4)
 
 let handle_request acc s =
   (match Gator_request.parse_request s with
-   | k, None -> add1 acc k
-   | k, Some v -> add2 acc k v
+   | k, None -> add_without_value acc k
+   | k, Some v -> add_with_value acc k v
   );
   return ()
 
@@ -170,17 +188,17 @@ let test_maxrate () =
 
   let acc = create_maxrate_acc ~time () in
   assert (acc.maxrate = 0.);
-  add_to_maxrate_acc acc;
-  add_to_maxrate_acc acc;
+  add_to_maxrate_acc acc 1.;
+  add_to_maxrate_acc acc 1.;
   assert (acc.maxrate = 2.);
 
   tick ();
   assert (acc.maxrate = 2.);
-  add_to_maxrate_acc acc;
+  add_to_maxrate_acc acc 1.;
   assert (acc.maxrate = 2.);
-  add_to_maxrate_acc acc;
-  add_to_maxrate_acc acc;
-  assert (acc.maxrate = 3.);
+  add_to_maxrate_acc acc 1.;
+  add_to_maxrate_acc acc 3.2;
+  assert (acc.maxrate = 5.2);
 
   true
 
