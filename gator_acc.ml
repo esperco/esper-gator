@@ -78,6 +78,9 @@ let add2 {acc2; acc3} k v =
   Hashtbl.replace acc2 k (v :: vl);
   add3 acc3 k
 
+let sum l =
+  List.fold_left (+.) 0. l
+
 let average l =
   assert (l <> []);
   List.fold_left (+.) 0. l /. float (List.length l)
@@ -105,7 +108,7 @@ let flush_accumulators ~namespace ~period acc =
   let points1 =
     Hashtbl.fold (fun k count l ->
       let rate = float count /. period in
-      let k1 = k ^ ".rate" in
+      let k1 = k ^ ".ev.rate" in
       Gator_aws_v.create_metric_data_point
         ~metric_name: k1
         ~value: rate
@@ -116,11 +119,13 @@ let flush_accumulators ~namespace ~period acc =
   let points2 =
     Hashtbl.fold (fun k vl l ->
       let data = [
-        k ^ ".rate", float (List.length vl) /. period;
-        k ^ ".average", average vl;
-        k ^ ".median", median vl;
-        k ^ ".min", minl vl;
-        k ^ ".max", maxl vl;
+        k ^ ".ev.rate", float (List.length vl) /. period;
+        k ^ ".val.sum", sum vl;
+        k ^ ".val.rate", sum vl /. period;
+        k ^ ".val.average", average vl;
+        k ^ ".val.median", median vl;
+        k ^ ".val.min", minl vl;
+        k ^ ".val.max", maxl vl;
       ] in
       let jobs =
         List.map (fun (k, v) ->
@@ -136,7 +141,7 @@ let flush_accumulators ~namespace ~period acc =
   let points3 =
     Hashtbl.fold (fun k v l ->
       let maxrate = v.maxrate in
-      let k1 = k ^ ".maxrate" in
+      let k1 = k ^ ".ev.maxrate" in
       Gator_aws_v.create_metric_data_point
         ~metric_name: k1
         ~value: maxrate
