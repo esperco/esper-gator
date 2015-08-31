@@ -19,7 +19,7 @@ let rec create_timer period action =
     (fun () -> action ())
     (fun e ->
        logf `Error "%s" (string_of_exn e);
-      return ()
+       return ()
     )
   >>= fun () ->
   (* finish after timer or after action, whichever finishes last *)
