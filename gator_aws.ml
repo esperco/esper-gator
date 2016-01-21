@@ -20,6 +20,10 @@ let write_to_temp_file metric_data =
   in
   return (file_url, finish)
 
+(*
+   aws command-line reference:
+http://docs.aws.amazon.com/cli/latest/reference/cloudwatch/put-metric-data.html
+*)
 let really_put_metric_data ~namespace metric_data =
   if List.length metric_data > 20 then
     invalid_arg "Gator_aws.really_put_metric_data";
@@ -31,6 +35,7 @@ let really_put_metric_data ~namespace metric_data =
          "aws"; "cloudwatch"; "put-metric-data";
          "--namespace"; namespace;
          "--metric-data"; file_url;
+         "--dimensions"; "InstanceId=Global"; (* required by Stackdriver *)
        |] in
        let cmd = String.concat " " (Array.to_list cmd_array) in
        logf `Info "%s" cmd;
