@@ -109,6 +109,22 @@ let median l =
   else
     0.5 *. (a.(n/2-1) +. a.(n/2))
 
+(*
+   EC2 instance ID of the build host (build-1) or some other
+   host where not much is running.
+
+   This is an artificial requirement imposed by Stackdriver
+   and lets see our custom events categorized under this EC2 instance.
+*)
+let build1_ec2_instance_id = "i-97a85978" (* build-1 *)
+
+let dimensions = [
+  {
+    name = "InstanceId";
+    value = build1_ec2_instance_id;
+  }
+]
+
 let flush_accumulators ~namespace ~period acc =
   add_without_value acc "gator.flush";
   let points1 =
@@ -119,7 +135,7 @@ let flush_accumulators ~namespace ~period acc =
         create_metric_data_point
           ~metric_name: k1
           ~value: rate
-          ~dimensions: [ { name = "InstanceId"; value = "Global" } ]
+          ~dimensions: [ { name = "InstanceId"; value = "i-97a85978" } ]
           ()
       ) :: l
     ) acc.acc_ev []
