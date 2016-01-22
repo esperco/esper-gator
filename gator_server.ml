@@ -45,6 +45,7 @@ let create
     ?(namespace = Gator_default.namespace)
     ?(period = Gator_default.period)
     ?(port = Gator_default.port)
+    ?ec2_instance_id
     () =
   let proto_number =
     (* not using
@@ -79,7 +80,12 @@ let create
   in
   let periodic_job =
     create_timer period
-      (fun () -> Gator_acc.flush_accumulators ~namespace ~period accumulators)
+      (fun () ->
+         Gator_acc.flush_accumulators
+           ~namespace
+           ~period
+           ~ec2_instance_id
+           accumulators)
   in
   let all = join [ server_loop (); periodic_job ] in
   all
@@ -93,6 +99,7 @@ let main ~offset =
   let namespace = ref Gator_default.namespace in
   let period = ref Gator_default.period in
   let port = ref Gator_default.port in
+  let ec2_instance_id = ref None in
   let options = [
     "-fg", Arg.Set foreground,
     "
@@ -114,17 +121,10 @@ let main ~offset =
     sprintf "
           Port (default: %i)" Gator_default.port;
 
-    "-ec2-instance-id",
-    Arg.String (fun s -> Gator_acc.ec2_instance_id := Some s),
-    sprintf "
-          EC2 instance ID of the build host (build-1) or some other
-          host where not much is running.
-
-          This is an artificial requirement imposed by Stackdriver
-          and lets see our custom events categorized under this EC2 instance.
-
-          Default: %s"
-      Gator_default.ec2_instance_id;
+    "-ec2-instance-id", Arg.String (fun s -> ec2_instance_id := Some s),
+    "
+          EC2 instance ID of the host to associate with the metrics.
+          This is optional, but needed for use with Stackdriver.";
   ]
   in
 
@@ -144,7 +144,12 @@ let main ~offset =
 
     let run () =
       let jobs =
-        create ~namespace: !namespace ~port: !port ~period: !period () in
+        create
+          ~namespace: !namespace
+          ~port: !port
+          ~period: !period
+          ?ec2_instance_id: !ec2_instance_id
+          () in
       Util_lwt_main.run jobs;
       assert false
     in
