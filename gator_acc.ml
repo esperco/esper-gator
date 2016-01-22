@@ -109,14 +109,18 @@ let median l =
   else
     0.5 *. (a.(n/2-1) +. a.(n/2))
 
+let ec2_instance_id = ref None
+
 let dimensions () =
-  let ec2_instance_id = (Conf.get ()).Conf_t.stackdriver_ec2_instance_id in
-  [
-    {
-      Gator_aws_t.name = "InstanceId";
-      value = ec2_instance_id;
-    }
-  ]
+  match !ec2_instance_id with
+  | None -> []
+  | Some ec2_instance_id ->
+      [
+        {
+          Gator_aws_t.name = "InstanceId";
+          value = ec2_instance_id;
+        }
+      ]
 
 let flush_accumulators ~namespace ~period acc =
   add_without_value acc "gator.flush";

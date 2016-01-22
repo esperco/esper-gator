@@ -113,6 +113,18 @@ let main ~offset =
     "-port", Arg.Set_int port,
     sprintf "
           Port (default: %i)" Gator_default.port;
+
+    "-ec2-instance-id",
+    Arg.String (fun s -> Gator_acc.ec2_instance_id := Some s),
+    sprintf "
+          EC2 instance ID of the build host (build-1) or some other
+          host where not much is running.
+
+          This is an artificial requirement imposed by Stackdriver
+          and lets see our custom events categorized under this EC2 instance.
+
+          Default: %s"
+      Gator_default.ec2_instance_id;
   ]
   in
 
