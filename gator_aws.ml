@@ -35,7 +35,6 @@ let really_put_metric_data ~namespace metric_data =
          "aws"; "cloudwatch"; "put-metric-data";
          "--namespace"; namespace;
          "--metric-data"; file_url;
-         "--dimensions"; "InstanceId=Global"; (* required by Stackdriver *)
        |] in
        let cmd = String.concat " " (Array.to_list cmd_array) in
        logf `Info "%s" cmd;

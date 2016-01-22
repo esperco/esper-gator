@@ -115,11 +115,13 @@ let flush_accumulators ~namespace ~period acc =
     Hashtbl.fold (fun k count l ->
       let rate = float count /. period in
       let k1 = k ^ ".ev.rate" in
-      Gator_aws_v.create_metric_data_point
-        ~metric_name: k1
-        ~value: rate
-        ()
-      :: l
+      Gator_aws_v.(
+        create_metric_data_point
+          ~metric_name: k1
+          ~value: rate
+          ~dimensions: [ { name = "InstanceId"; value = "Global" } ]
+          ()
+      ) :: l
     ) acc.acc_ev []
   in
   let points2 =

@@ -52,6 +52,13 @@ type metric_data_point = {
   ?unit <json name="Unit">: unit_ option;
 
   ?statistic_values <json name="StatisticValues">: statistic_values option;
+
+  ~dimensions <json name="Dimensions">: dimension list;
 }
 
 type metric_data = metric_data_point list
+
+type dimension = {
+  name <json name="Name"> : string;
+  value <json name="Value"> : string;
+}
