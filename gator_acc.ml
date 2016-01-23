@@ -109,7 +109,7 @@ let median l =
   else
     0.5 *. (a.(n/2-1) +. a.(n/2))
 
-let dimensions opt_ec2_instance_id =
+let get_dimensions opt_ec2_instance_id =
   match opt_ec2_instance_id with
   | None -> []
   | Some ec2_instance_id ->
@@ -122,6 +122,7 @@ let dimensions opt_ec2_instance_id =
 
 let flush_accumulators ~namespace ~period ~ec2_instance_id acc =
   add_without_value acc "gator.flush";
+  let dimensions = get_dimensions ec2_instance_id in
   let points1 =
     Hashtbl.fold (fun k count l ->
       let rate = float count /. period in
@@ -130,7 +131,7 @@ let flush_accumulators ~namespace ~period ~ec2_instance_id acc =
         create_metric_data_point
           ~metric_name: k1
           ~value: rate
-          ~dimensions: (dimensions ec2_instance_id)
+          ~dimensions
           ()
       ) :: l
     ) acc.acc_ev []
@@ -151,6 +152,7 @@ let flush_accumulators ~namespace ~period ~ec2_instance_id acc =
           Gator_aws_v.create_metric_data_point
             ~metric_name: k
             ~value: v
+            ~dimensions
             ()
         ) data
       in
@@ -164,6 +166,7 @@ let flush_accumulators ~namespace ~period ~ec2_instance_id acc =
       Gator_aws_v.create_metric_data_point
         ~metric_name: k1
         ~value: maxrate
+        ~dimensions
         ()
       :: l
     ) acc.maxrate_acc_ev []
@@ -175,6 +178,7 @@ let flush_accumulators ~namespace ~period ~ec2_instance_id acc =
       Gator_aws_v.create_metric_data_point
         ~metric_name: k1
         ~value: maxrate
+        ~dimensions
         ()
       :: l
     ) acc.maxrate_acc_val []
