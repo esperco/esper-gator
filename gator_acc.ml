@@ -1,4 +1,35 @@
+(*
+   Global accumulators of data, meant to be sent to AWS Cloudwatch
+   every minute.
+
+   We support two kinds of data:
+   - events without an associated value
+   - events associated with a numeric (float) value
+
+   Components of the software application report events to the gator
+   server. Gator accumulates the data points for, normally, one minute, then
+   sends statistics to Cloudwatch in the form of multiple metrics.
+
+   For a simple event without numeric values, we post the rate (Hz)
+   over the window and its maximum rate observed over any
+   one-second subwindow. These metric names are the event name with the
+   suffix ".ev.rate" and ".ev.maxrate" respectively.
+
+   For events with associated values, we also report average rates
+   and maximum rates. Additionally, we compute the following statistics
+   over the values:
+   - sum of the values: ".val.sum"
+   - value rate over the whole window, i.e. sum of the values
+     divided by window length: ".val.rate"
+   - average value: ".val.average"
+   - median value: ".val.median"
+   - minimum value: ".val.min"
+   - maximum value: ".val.max"
+   - maximum value rate over one-second subwindows: ".val.maxrate"
+*)
+
 open Lwt
+open Log
 
 type acc_ev = (string, int) Hashtbl.t
   (* Counters only, used to compute an average rate only. *)
@@ -187,7 +218,9 @@ let flush_accumulators ~namespace ~period ~ec2_instance_id acc =
   Hashtbl.clear acc.acc_val;
   Hashtbl.clear acc.maxrate_acc_ev;
   Hashtbl.clear acc.maxrate_acc_val;
-  Gator_aws.put_metric_data ~namespace (points1 @ points2 @ points3 @ points4)
+  let points = points1 @ points2 @ points3 @ points4 in
+  logf `Info "Sending data for %i Cloudwatch metrics" (List.length points);
+  Gator_aws.put_metric_data ~namespace points
 
 let handle_request acc s =
   (match Gator_request.parse_request s with

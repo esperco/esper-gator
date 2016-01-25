@@ -46,6 +46,7 @@ let really_put_metric_data ~namespace metric_data =
            finish ()
     )
     (fun e ->
+       logf `Error "FAILED: exception %s" (string_of_exn e);
        finish ()
     )
 
