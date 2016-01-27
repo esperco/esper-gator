@@ -51,10 +51,15 @@ let really_put_metric_data ~namespace metric_data =
     )
 
 let rec chunkify max_length l =
-  let chunk, rest = BatList.takedrop max_length l in
-  match rest with
-  | [] -> [chunk]
-  | rest -> chunk :: chunkify max_length rest
+  if max_length <= 0 then
+    invalid_arg "Gator_aws.chunkify";
+  match l with
+  | [] -> []
+  | l ->
+      let chunk, rest = BatList.takedrop max_length l in
+      match rest with
+      | [] -> [chunk]
+      | rest -> chunk :: chunkify max_length rest
 
 let put_metric_data ~namespace metric_data =
   Util_conc.iter (chunkify 20 metric_data) (fun chunk ->
