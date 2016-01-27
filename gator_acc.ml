@@ -153,6 +153,10 @@ let get_dimensions opt_ec2_instance_id =
 
 let flush_accumulators ~namespace ~period ~ec2_instance_id acc =
   add_without_value acc "gator.flush";
+  (match Util_linux.get_resident_memory_size (Unix.getpid ()) with
+   | None -> ();
+   | Some x -> add_with_value acc "gator.mem.rss" x
+  );
   let dimensions = get_dimensions ec2_instance_id in
   let points1 =
     Hashtbl.fold (fun k count l ->
