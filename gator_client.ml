@@ -57,6 +57,7 @@ let main ~offset =
   let value = ref None in
   let host = ref Gator_default.host in
   let port = ref Gator_default.port in
+  let sleep = ref 0. in
   let options = [
     "-host", Arg.Set_string host,
     sprintf "
@@ -64,6 +65,9 @@ let main ~offset =
     "-port", Arg.Set_int port,
     sprintf "
           Port (default: %i)" Gator_default.port;
+    "-sleep", Arg.Set_float sleep,
+    sprintf "
+          Sleep (seconds) after sending an event. Default: no sleep."
   ]
   in
 
@@ -71,8 +75,11 @@ let main ~offset =
   let anon_fun s = anon := s :: !anon in
 
   let usage_msg =
-    sprintf
-      "Usage: %s KEY [VALUE] [OPTIONS]\nSupported options:\n"
+    sprintf "\
+Send a data point to gator repeatedly.
+Usage: %s KEY [VALUE] [OPTIONS]
+Supported options:
+"
       argv.(offset)
   in
   let usage () = Arg.usage options usage_msg in
@@ -96,6 +103,11 @@ let main ~offset =
       let rec loop () =
         let send = make_send ~host: !host ~port: !port () in
         send !key !value >>= fun () ->
+        (if !sleep > 0. then
+           Lwt_unix.sleep !sleep
+         else
+           return ()
+        ) >>= fun () ->
         loop ()
       in
       loop ()
