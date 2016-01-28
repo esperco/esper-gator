@@ -223,7 +223,13 @@ let flush_accumulators ~namespace ~period ~ec2_instance_id acc =
   Hashtbl.clear acc.maxrate_acc_ev;
   Hashtbl.clear acc.maxrate_acc_val;
   let points = points1 @ points2 @ points3 @ points4 in
-  logf `Info "Sending data for %i Cloudwatch metrics" (List.length points);
+
+  let metric_count = List.length points in
+  logf `Info "Sending data for %i Cloudwatch metrics" metric_count;
+
+  (* This count will be reported at the next iteration *)
+  add_with_value acc "gator.metric.count" (float metric_count);
+
   Gator_aws.put_metric_data ~namespace points
 
 let handle_request acc s =
