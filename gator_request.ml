@@ -34,4 +34,4 @@ let make_request key opt_value =
   in
   if String.length s > 512 then
     failwith "Gator request exceeds maximum value of 512";
-  s
+  Bytes.of_string s

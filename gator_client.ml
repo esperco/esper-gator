@@ -42,8 +42,8 @@ let make_send
     get_socket_portaddr () >>= fun (socket, portaddr) ->
     let msg = Gator_request.make_request key opt_value in
     Lwt_unix.sendto
-      socket msg 0 (String.length msg) [] portaddr >>= fun len ->
-    assert (len = String.length msg);
+      socket msg 0 (Bytes.length msg) [] portaddr >>= fun len ->
+    assert (len = Bytes.length msg);
     return ()
   in
   send
