@@ -10,7 +10,6 @@ open Printf
 open Log
 open Lwt
 
-
 let rec create_timer period action =
   Lwt_unix.sleep period >>= fun () ->
   (* start next period immediately *)
@@ -41,6 +40,12 @@ let init_logging opt_file =
   | Some file -> redirect_stdout_stderr file
   | None -> ()
 
+let rec repeat f =
+  (* Do not use the (>>=) operator which is expanded by Trax
+     into something that extends a call trace, resulting
+     in a memory leak (and useless giant trace). *)
+  Lwt.bind (f ()) (fun () -> repeat f)
+
 let create
     ?(namespace = Gator_default.namespace)
     ?(period = Gator_default.period)
@@ -62,7 +67,7 @@ let create
   let accumulators = Gator_acc.create_acc () in
 
   let buf = Lwt_bytes.create 65536 in
-  let rec server_loop () =
+  let server_handler () =
     Lwt_bytes.recvfrom socket buf 0 (Lwt_bytes.length buf) []
     >>= fun (len, sender_addr) ->
     (if len >= 0 then (
@@ -75,8 +80,7 @@ let create
          return ()
      )
      else return ()
-    ) >>= fun () ->
-    server_loop ()
+    )
   in
   let periodic_job =
     create_timer period
@@ -87,7 +91,7 @@ let create
            ~ec2_instance_id
            accumulators)
   in
-  let all = join [ server_loop (); periodic_job ] in
+  let all = join [ repeat server_handler; periodic_job ] in
   all
 
 let main ~offset =
