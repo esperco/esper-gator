@@ -62,7 +62,13 @@ let create
   let socket =
     Lwt_unix.socket Unix.PF_INET Unix.SOCK_DGRAM proto_number
   in
-  Lwt_unix.bind socket (Unix.ADDR_INET (Unix.inet_addr_any, port));
+  (*
+     This non-blocking version of bind
+     will be available as `Lwt_unix.bind` starting from Lwt 3.0.0
+  *)
+  Lwt_unix.Versioned.bind_2
+    socket (Unix.ADDR_INET (Unix.inet_addr_any, port))
+  >>= fun () ->
 
   let accumulators = Gator_acc.create_acc () in
 
