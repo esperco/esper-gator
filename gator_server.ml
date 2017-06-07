@@ -66,7 +66,7 @@ let create
      This non-blocking version of bind
      will be available as `Lwt_unix.bind` starting from Lwt 3.0.0
   *)
-  Lwt_unix.Versioned.bind_2
+  Lwt_unix.bind
     socket (Unix.ADDR_INET (Unix.inet_addr_any, port))
   >>= fun () ->
 

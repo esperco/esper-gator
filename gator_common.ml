@@ -24,7 +24,7 @@ let parse_value s =
   v
 
 let turn_into_key ~keep_periods s0 =
-  let s = Bytes.lowercase (Bytes.of_string s0) in
+  let s = Bytes.lowercase_ascii (Bytes.of_string s0) in
   for i = 0 to Bytes.length s - 1 do
     match Bytes.get s i with
     | 'a'..'z'
