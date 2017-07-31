@@ -183,7 +183,7 @@ let flush_accumulators ~namespace ~period ~ec2_instance_id acc =
         k ^ ".val.max", maxl vl;
       ] in
       let jobs =
-        List.map (fun (k, v) ->
+        BatList.map (fun (k, v) ->
           Gator_aws_v.create_metric_data_point
             ~metric_name: k
             ~value: v
